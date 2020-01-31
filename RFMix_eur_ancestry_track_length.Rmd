@@ -1,0 +1,538 @@
+---
+title: "Untitled"
+author: "Aaron Wolf"
+date: "08/29/2018"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r}
+
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+library(RColorBrewer)
+library(scales)
+
+```
+
+
+
+```{r}
+
+# eur_neand_anc.corr <- fread('~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EUR_AFR/Neand_EUR_ancestry_corr.o', col.names = c('ID','EUR_anc','Neand_anc'))
+# 
+# eas_neand_anc.corr <- fread('~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_AFR/Neand_EAS_ancestry_corr.o', col.names = c('ID','EAS_anc','Neand_anc'))
+# 
+eur_ancestry <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/chr1_*.0.Viterbi.txt.recode.EUR.bed', col.names = c('chr','strt','end')) %>%
+                mutate(length = end-strt) %>% as.data.table()
+
+eas_ancestry <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/chr1_*.0.Viterbi.txt.recode.EAS.bed', col.names = c('chr','strt','end')) %>%
+                mutate(length = end-strt) %>% as.data.table()
+
+
+# 
+# neand_ancestry <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/Altai.2013.p_SingleArchaic.final_callset/calls_per_ind/*.bed') %>%
+#                   select(1:5) %>% setnames(c('chr','strt','end','ID','Pop')) %>%
+#                   mutate(length = end-strt) %>% as.data.table()
+# 
+# neand_eurancestry_overlap <- fread('~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/Viterbi_out/Neand_EURancestry_overlap.summary', col.names = c('replicate','mean_overlap_rate'))
+# 
+# dt <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/Viterbi_out/stdout/Neand_EURancestry_overlap.*', col.names = c('ind_overlap_rate'))
+# 
+# neand_eurancestry_overlap.empirical <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/Viterbi_out/Neand_EURancestry_overlap.empirical | grep overlap | cut -f 2 -d ":"', 
+#                                              col.names =  c('ind_overlap_rate'))
+
+```
+
+
+```{r EUR and EAS overlap rates calculated from exclusive sequence}
+
+neand_eurancestry_overlap.diff <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EUR_AFR/Viterbi_out/stdout/rnd1.diff/Neand_EURancestry_overlap.summary ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EUR_AFR/Viterbi_out/stdout/rnd2.diff/Neand_EURancestry_overlap.summary', col.names = c('replicate','mean_overlap_rate'))
+
+neand_eurancestry_overlap.empirical.diff <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EUR_AFR/Viterbi_out/Neand_EURancestry_overlap.empirical.diff', 
+                                             col.names =  c('ID','ind_overlap_rate'))
+
+neand_easancestry_overlap.diff <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_AFR/Viterbi_out/stdout/rnd1.diff/Neand_EASancestry_overlap.summary ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_AFR/Viterbi_out/stdout/rnd2.diff/Neand_EASancestry_overlap.summary', col.names = c('replicate','mean_overlap_rate'))
+
+neand_easancestry_overlap.empirical.diff <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_AFR/Viterbi_out/Neand_EASancestry_overlap.empirical.diff', 
+                                             col.names =  c('ID','ind_overlap_rate'))
+
+
+neand_ancestry <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/Altai.2013.p_SingleArchaic.final_callset/calls_per_ind/*.bed') %>%
+                  select(1:5) %>% setnames(c('chr','strt','end','ID','Pop')) %>%
+                  mutate(length = end-strt) %>% as.data.table()
+
+
+eur_ancestry.diff <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EUR_AFR/Viterbi_out/chr1_*.0.Viterbi.txt.recode.bed.diff', col.names = c('chr','strt','end')) %>%
+                mutate(length = end-strt) %>% as.data.table()
+
+eur_ancestry <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EUR_AFR/Viterbi_out/chr1_*.0.Viterbi.txt.recode.bed', col.names = c('chr','strt','end')) %>%
+                mutate(length = end-strt) %>% as.data.table()
+
+eas_ancestry.diff <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_AFR/Viterbi_out/chr1_*.0.Viterbi.txt.recode.bed.diff', col.names = c('chr','strt','end')) %>%
+                mutate(length = end-strt) %>% as.data.table()
+
+eas_ancestry <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_AFR/Viterbi_out/chr1_*.0.Viterbi.txt.recode.bed', col.names = c('chr','strt','end')) %>%
+                mutate(length = end-strt) %>% as.data.table()
+
+```
+
+
+```{r EUR and EAS ancestry called in 3-way RFMix run}
+
+neand_eurancestry_overlap <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd1/Neand_EURancestry_overlap.summary ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd2/Neand_EURancestry_overlap.summary ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd3/Neand_EURancestry_overlap.summary ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd4/Neand_EURancestry_overlap.summary ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd5/Neand_EURancestry_overlap.summary', col.names = c('replicate','mean_overlap_rate'))
+
+neand_eurancestry_overlap.empirical <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/Neand_EURancestry_overlap.empirical', 
+                                             col.names =  c('ind_overlap_rate'))
+
+neand_easancestry_overlap <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd1/Neand_EASancestry_overlap.summary ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd2/Neand_EASancestry_overlap.summary                                   ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd3/Neand_EASancestry_overlap.summary ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd4/Neand_EASancestry_overlap.summary ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/stdout/rnd5/Neand_EASancestry_overlap.summary', col.names = c('replicate','mean_overlap_rate'))
+
+neand_easancestry_overlap.empirical <- fread(cmd = 'cat ~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/Neand_EASancestry_overlap.empirical', 
+                                             col.names =  c('ind_overlap_rate'))
+
+```
+
+
+
+
+```{r Correlation of nonAFR and Neand ancestry}
+
+ggplot() + theme_classic() +
+  geom_point(data=eur_neand_anc.corr, aes(y=EUR_anc, x=Neand_anc)) +
+  geom_smooth(data=eur_neand_anc.corr, aes(y=EUR_anc, x=Neand_anc), method = "lm",color='blue') +
+#   theme()
+# 
+# ggplot() + theme_classic() +
+  geom_point(data=eas_neand_anc.corr, aes(y=EAS_anc, x=Neand_anc)) +
+  geom_smooth(data=eas_neand_anc.corr, aes(y=EAS_anc, x=Neand_anc), method = "lm", color='red') +
+  theme()
+
+ggplot() + theme_classic() +
+  geom_point(data=left_join(eur_neand_anc.corr, eas_neand_anc.corr, by = 'ID'), aes(y=EUR_anc, x=EAS_anc)) +
+  geom_smooth(data=left_join(eur_neand_anc.corr, eas_neand_anc.corr, by = 'ID'), aes(y=EUR_anc, x=EAS_anc), method = "lm",color='green') +
+   theme()
+
+```
+
+
+```{r Lenfth of nonAFR ancestry tracks}
+
+ggplot() + theme_classic() +
+  geom_density(data=eur_ancestry.diff[length > 1], aes(x=length/1000, fill = 'eur_ancestry', color = 'eur_ancestry.diff'), alpha=0.3, size=3) +
+#  geom_density(data=neand_ancestry[length > 1], aes(x=length/1000, fill = 'neand_ancestry', color = 'neand_ancestry'), alpha=0.3, size=3) + 
+  geom_vline(xintercept = mean(eur_ancestry.diff[length > 1]$length/1000), color='blue', size=2) +
+  geom_vline(xintercept = median(eur_ancestry.diff[length > 1]$length/1000), color='red', size=2) +
+  coord_cartesian(xlim = c(0,1500)) +
+  scale_color_brewer(type = 'qual', palette = 'Dark2') +
+  scale_fill_brewer(type = 'qual', palette = 'Dark2') +
+#   theme()
+# 
+# 
+# 
+# ggplot() + theme_classic() +
+  geom_density(data=eur_ancestry[length > 1], aes(x=length/1000, fill = 'eur_ancestry', color = 'eur_ancestry'), alpha=0.3, size=3) +
+#  geom_density(data=neand_ancestry[length > 1], aes(x=length/1000, fill = 'neand_ancestry', color = 'neand_ancestry'), alpha=0.3, size=3) + 
+  geom_vline(xintercept = mean(eur_ancestry[length > 1]$length/1000), color='blue', size=2) +
+  geom_vline(xintercept = median(eur_ancestry[length > 1]$length/1000), color='red', size=2) +
+  coord_cartesian(xlim = c(0,1500)) +
+  scale_color_brewer(type = 'qual', palette = 'Dark2') +
+  scale_fill_brewer(type = 'qual', palette = 'Dark2') +
+  theme()
+
+####
+####
+
+ggplot() + theme_classic() +
+  geom_density(data=eas_ancestry.diff[length > 1], aes(x=length/1000, fill = 'eur_ancestry', color = 'eur_ancestry.diff'), alpha=0.3, size=3) +
+#  geom_density(data=neand_ancestry[length > 1], aes(x=length/1000, fill = 'neand_ancestry', color = 'neand_ancestry'), alpha=0.3, size=3) + 
+  geom_vline(xintercept = mean(eas_ancestry.diff[length > 1]$length/1000), color='blue', size=2) +
+  geom_vline(xintercept = median(eas_ancestry.diff[length > 1]$length/1000), color='red', size=2) +
+  coord_cartesian(xlim = c(0,1500)) +
+  scale_color_brewer(type = 'qual', palette = 'Dark2') +
+  scale_fill_brewer(type = 'qual', palette = 'Dark2') +
+#   theme()
+# 
+# 
+# 
+# ggplot() + theme_classic() +
+  geom_density(data=eas_ancestry[length > 1], aes(x=length/1000, fill = 'eur_ancestry', color = 'eur_ancestry'), alpha=0.3, size=3) +
+#  geom_density(data=neand_ancestry[length > 1], aes(x=length/1000, fill = 'neand_ancestry', color = 'neand_ancestry'), alpha=0.3, size=3) + 
+  geom_vline(xintercept = mean(eas_ancestry[length > 1]$length/1000), color='blue', size=2) +
+  geom_vline(xintercept = median(eas_ancestry[length > 1]$length/1000), color='red', size=2) +
+  coord_cartesian(xlim = c(0,1500)) +
+  scale_color_brewer(type = 'qual', palette = 'Dark2') +
+  scale_fill_brewer(type = 'qual', palette = 'Dark2') +
+  theme()
+
+
+```
+
+
+```{r Length of Neand ancestry segments}
+ggplot() + theme_classic() +
+  geom_histogram(data=neand_ancestry, aes(x=length/1000), binwidth = 10) +
+  geom_vline(xintercept = mean(neand_ancestry$length/1000), color='blue', size=2) +
+  geom_vline(xintercept = median(neand_ancestry$length/1000), color='red', size=2) +
+  theme()
+```
+
+
+```{r Mean overlap rate of neand and nonAFR segments}
+ggplot() + theme_classic() + 
+  geom_density(data=neand_eurancestry_overlap.diff, aes(x=mean_overlap_rate)) +
+  geom_vline(xintercept = mean(neand_eurancestry_overlap.empirical.diff$ind_overlap_rate)) +
+#   ggtitle('Neand calls intersect exclusive European Ancestry')+
+#   #coord_cartesian(xlim=c(0.025,.06)) +
+#   theme()
+# 
+# ggplot() + theme_classic() + 
+  geom_density(data=neand_easancestry_overlap.diff, aes(x=mean_overlap_rate)) +
+  geom_vline(xintercept = mean(neand_easancestry_overlap.empirical.diff$ind_overlap_rate)) +
+  #coord_cartesian(xlim=c(0.025,.06)) +
+  ggtitle('Neand calls intersect exclusive East Asian Ancestry')+
+  theme()
+
+ggplot() + theme_classic() + 
+  geom_histogram(data=neand_eurancestry_overlap.diff, aes(x=mean_overlap_rate), bins = 200) +
+  geom_vline(xintercept = mean(neand_eurancestry_overlap.empirical.diff$ind_overlap_rate)) +
+#  coord_cartesian(xlim=c(0.025,.06)) +
+  theme()
+
+```
+
+
+```{r Plot Distribution of Mean Overlap Rate for EUR and}
+
+plot.theme <-theme(
+        #legend.position="none"m
+        legend.text=element_text(size=10),
+        #panel.grid.major=element_line(color="black"),
+        panel.grid=element_blank(),
+        axis.line.x=element_line(color="black", size=2),
+        axis.line.y=element_line(color="black",size=2),
+        plot.title=element_text(face="bold", color="black", size=22, hjust = 0.5, family = "Helvetica"),
+        axis.text=element_text(face="bold", color="black", size=22, family = "Helvetica"),
+        axis.title=element_text(face="bold", color="black", size=22, family = "Helvetica")
+        )
+
+
+eur <- 
+  ggplot() + theme_classic() +
+  geom_density(data=neand_eurancestry_overlap, aes(x=(mean_overlap_rate), color='EUR',fill='EUR'), size = 3, alpha=0.3) +
+  geom_vline(xintercept = (mean(neand_eurancestry_overlap.empirical$ind_overlap_rate)), 
+             aes(color='EUR', fill='EUR'), size=3, color='dodgerblue4', linetype="dashed") +
+  
+  scale_fill_manual(values=c('EUR'='dodgerblue4','EAS'='orange3')) +
+  scale_color_manual(values=c('EUR'='dodgerblue4','EAS'='orange3')) +
+  
+  coord_cartesian(xlim=c(0.02,0.045), ylim=c(10,220)) +
+ # scale_y_continuous(breaks = seq(0,15,by=5), labels = scales::number_format(accuracy = 1), position = "right") +
+  #scale_x_continuous(breaks = seq(0,3,by=0.25), labels = scales::number_format(accuracy = .25)) +
+  ggtitle('Overlap Rate of Neanderthal and European Ancestry\n')+
+  xlab('\nMean Overlap Rate') +
+  ylab('') +
+  plot.theme
+
+
+eas <- 
+  ggplot() + theme_classic() +
+  geom_density(data=neand_easancestry_overlap, aes(x=(mean_overlap_rate), color='EAS',fill='EAS'), size=3, alpha=0.3) +
+  geom_vline(xintercept = (mean(neand_easancestry_overlap.empirical$ind_overlap_rate)), 
+             aes(color='EAS', fill='EAS'), color='orange3', size=3, linetype="dashed") +
+    
+  scale_fill_manual(values=c('EUR'='dodgerblue4','EAS'='orange3')) +
+  scale_color_manual(values=c('EUR'='dodgerblue4','EAS'='orange3')) +
+
+  coord_cartesian(xlim=c(0.002,0.01), ylim=c(28,600)) +
+  scale_y_continuous(breaks = seq(0,600,by=150), labels = scales::number_format(accuracy = 1), position = "left") +
+  scale_x_continuous(breaks = seq(0.000,0.01,by=0.002), labels = scales::number_format(accuracy = .001)) +
+  ggtitle('Overlap Rate of Neanderthal and East Asian Ancestry\n')+
+  xlab('\nMean Overlap Rate') +
+  ylab('') +
+  plot.theme
+
+
+grid.arrange(eas, eur, ncol=2)
+
+```
+
+
+
+
+```{r Load Neand calls and Gene positions}
+  
+Altai.2013.p_SingleArchaic = fread('~/DATALab/NeanderthalSeq/IBDmix/Altai.2013.p_SingleArchaic.final_callset/Altai2013pub.1KGP3.LOD4.50K.filterAFRDeni.txt', header=FALSE,
+                                   col.names =c('chr','start','end','score1','score2','length_bp','pop','anc','ID'))
+
+color.values <- c('EUR' = 'orange3','EAS'='green4','SAS'='cyan3', 'AFR'='mediumpurple3', 'AMR'='plum','YRI'='dodgerblue1')
+ancestry.levels <- c('AFR','EUR','EAS','SAS', 'AMR')
+#ancestry.levels <- c('AFR','EUR','EAS')
+
+
+calls = Altai.2013.p_SingleArchaic %>% select(ID, chr, start, end, pop, anc) %>%
+        mutate(anc = factor(anc, levels = ancestry.levels)) %>%
+        filter(anc %in% c('AFR','EUR','EAS')) %>%
+        arrange(anc, pop, ID) %>% as.data.table()
+calls[, ID.mod := .GRP, by = c('anc','ID')]  
+  
+  
+Adaptive.2016.callset = fread('cat ~/DATALab/NeanderthalSeq/AdaptiveIntrogression/adaptive_introgressed_regions_*.txt | grep -v chromosome', header = FALSE,
+                              col.names = c('chr','start','end','freq1', 'freq2','freq3',
+                                            'freq4','freq5','freq6','freq7','tagSNPs_+_SNPsLD','haplo_len','haplo_chr',
+                                            'extended_LD_start','extended_LD_end','Nearest_Genes','GWAS_SNP','eQTL','FDR','arch'), na.strings = c("NA")) %>%
+  filter(arch=='neand' | arch=="") %>%
+  rowwise() %>% mutate(chr=as.numeric(strsplit(chr, split = 'r')[[1]][[2]])) %>%
+  as.data.table()
+
+
+GenePosNames = fread('gzcat ~/OLDAKEYLab/akey_vol2/home/abwolf/AkeyRotation/NeandDepletions/RefSeqGenes.nobackup/Depletions.chrALL_FULL_RefSeqGeneIDs.gz', header=TRUE) %>%
+                rowwise() %>% mutate(hg19.knownGene.chrom=as.numeric(strsplit(hg19.knownGene.chrom, split = 'r')[[1]][[2]]))  %>%
+                filter(hg19.knownGene.chrom %in% seq(1,22,by = 1)) %>%
+                mutate(chr=hg19.knownGene.chrom) %>%
+                as.data.table()
+
+GenePosNames.uniq <- subset(GenePosNames,!duplicated(GenePosNames$hg19.kgXref.geneSymbol)) %>% filter(!grepl("LOC[0-9]",hg19.kgXref.geneSymbol))
+
+gwasSNPs <- fread( 'gzcat ~/OLDAKEYLab/akey_vol2/home/abwolf/AkeyRotation/NeandDepletions/GWAS.nobackup/gwasdb_20150819_snp_trait.gz', header = TRUE)
+
+
+
+coord.table <- data.table(NULL)
+drop.table <- data.table(
+              chr = numeric(),
+              strt = numeric(),
+              end = numeric()
+              )
+
+```
+
+
+
+```{r Load calls and set plot constants}
+
+i <- '~/DATALab//NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out'
+setwd(i)
+
+# dt <- fread(cmd = 'cat ~/DATALab//NeanderthalSeq/IBDmix/RFMixtest/EUR_AFR/Viterbi_out/*.recode.bed.diff | sort-bed - | bedmap --ec --delim "\t" --echo --count  ~/DATALab//NeanderthalSeq/IBDmix/RFMixtest/EUR_AFR/Viterbi_out/chr1_ALL.0.Viterbi.txt.recode.bed.diff.merged - | bedmap --ec --delim "\t" --echo --count - ~/DATALab/NeanderthalSeq/IBDmix/Altai.2013.p_SingleArchaic.final_callset/AFRcalls.bed | bedmap --ec --delim "\t" --echo --count - ~/DATALab/NeanderthalSeq/IBDmix/Altai.2013.p_SingleArchaic.final_callset/EUR_EAScalls.bed',
+#             col.names = c('chr','strt','end','EUR_anc_count','AFR_Neand_count', 'nonAFR_Neand_count')) %>%
+#       mutate(len_MB=(end-strt)/1000000) %>% as.data.table()
+
+
+dt <- fread(cmd = 'cat ~/DATALab//NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/chr1_*.0.Viterbi.txt.recode.EUR.bed | sort-bed - | bedmap --ec --delim "\t" --echo --count - | bedmap --ec --delim "\t" --echo --count - ~/DATALab/NeanderthalSeq/IBDmix/Altai.2013.p_SingleArchaic.final_callset/AFRcalls.bed | bedmap --ec --delim "\t" --echo --count - ~/DATALab/NeanderthalSeq/IBDmix/Altai.2013.p_SingleArchaic.final_callset/EURcalls.bed | bedmap --ec --delim "\t" --echo --count - ~/DATALab/NeanderthalSeq/IBDmix/Altai.2013.p_SingleArchaic.final_callset/EAScalls.bed',
+            col.names = c('chr','strt','end','EUR_anc_count','AFR_Neand_count', 'EUR_Neand_count','EAS_Neand_count')) %>%
+      mutate(len_MB=(end-strt)/1000000) %>% as.data.table()
+
+
+quantile(dt[len_MB > 1/1000000]$AFR_Neand_count, c(0.9))
+
+
+ggplot() + theme_classic() + 
+  stat_ecdf(data = dt[len_MB > 1/1000000], aes(x=AFR_Neand_count)) +
+  geom_hline(yintercept = 0.9) +
+  scale_x_continuous(breaks=seq(0,800,by=100),labels=seq(0,800,by=100)) +
+  coord_cartesian(xlim=c(0,200))
+```
+
+
+```{r}
+
+anc.calls <- fread('~/DATALab//NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/Viterbi_out/chr1_ALL.0.Viterbi.txt.recode.ALL.bed', col.names = c('ID','chr','start','end','anc.call'))
+
+anc.calls <- left_join(anc.calls, calls %>% select('ID', 'ID.mod') %>% unique(), by='ID')
+
+
+plot.theme <-   
+  theme(    
+    plot.title=element_text(face="bold"),
+    axis.text=element_text(face="bold"),
+    axis.title=element_text(face="bold"),
+    axis.text.x = element_text(angle = 45))
+
+```
+
+```{r}
+# arrange(len_MB, desc(AFR_Neand_count), nonAFR_Neand_count)
+# dt %>% filter(AFR_Neand_count > 0, len_MB > 1/1000000) %>% arrange(nonAFR_Neand_count) %>% head()
+
+c <- dt %>% filter(AFR_Neand_count > 10, len_MB > 1/1000000, EAS_Neand_count<EUR_Neand_count) %>% arrange(EAS_Neand_count, desc(EUR_Neand_count), desc(AFR_Neand_count), desc(EUR_anc_count)) %>% head(n=1) %>% select(chr) %>% as.numeric()
+st <- dt %>% filter(AFR_Neand_count > 10, len_MB > 1/1000000, EAS_Neand_count<EUR_Neand_count) %>% arrange(EAS_Neand_count, desc(EUR_Neand_count), desc(AFR_Neand_count), desc(EUR_anc_count)) %>% head(n=1) %>% select(strt) %>% as.numeric() - 50000
+ed <- dt %>% filter(AFR_Neand_count > 10, len_MB > 1/1000000, EAS_Neand_count<EUR_Neand_count) %>% arrange(EAS_Neand_count, desc(EUR_Neand_count), desc(AFR_Neand_count), desc(EUR_anc_count)) %>% head(n=1) %>% select(end) %>% as.numeric() + 50000
+  
+
+tg <- Adaptive.2016.callset %>% filter(chr==c & start > st & end < ed)
+tg2 <- GenePosNames.uniq %>% filter(chr==c & hg19.knownGene.txStart > st & hg19.knownGene.txEnd < ed)
+gws <- gwasSNPs %>% filter(CHR==c & POS %in% seq(st, ed) , P_VALUE <= 1.0e-8)
+
+
+f1 <- 
+  ggplot() + theme_bw() +
+  
+  geom_segment(data=filter(calls, chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod, yend=ID.mod, color=as.factor(anc)), alpha=1, size=1.5) +
+  geom_segment(data=filter(calls, pop=='YRI', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod, yend=ID.mod, color=as.factor(pop)), alpha=1, size=1.5) + 
+  coord_cartesian(xlim=c(st, ed), ylim = c(0,1670)) +
+    
+  geom_segment(data=filter(anc.calls, anc.call=='EUR', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod-0.25, yend=ID.mod-0.25, color=as.factor(anc.call)), linetype='dotdash') +
+  geom_segment(data=filter(anc.calls, anc.call=='EAS', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod+0.25, yend=ID.mod+0.25, color=as.factor(anc.call)), linetype='dotdash') +
+  facet_wrap(~chr, scales = "free_x") +
+  xlab('genomic_position') +
+  scale_x_continuous(breaks = seq(st,ed,by = 100000), labels=scientific(x = seq(st,ed,by = 100000), digits = 5)) +
+  scale_color_manual(values = color.values) +
+  ggtitle('Altai.2013.p_SingleArchaic ; IBDmix Calls') +
+  geom_rect(data=tg2, aes(xmin=hg19.knownGene.cdsStart, xmax=hg19.knownGene.cdsEnd, ymin=max(calls$ID.mod)+50, ymax=max(calls$ID.mod)+150), fill='steelblue1', alpha=1) + geom_text(data = tg2, aes(x=hg19.knownGene.cdsStart, y= max(calls$ID.mod)+200, label=hg19.kgXref.geneSymbol), size=3, angle=45) +
+  geom_point(data = gws, aes(x=POS, y=max(calls$ID.mod)+100), size=3, color="purple4", shape=17) +
+#  geom_point(data = tg, aes(x=start+haplo_len/2, y=max(calls$ID.mod)+100), size=3, color="red") +
+  plot.theme
+
+  
+calls.temp <- 
+  rbind(
+    inner_join(
+      filter(calls, anc=='AFR', chr==c, start>st, end<ed), 
+      filter(anc.calls, anc.call=='EUR', chr==c, start>st, end<ed), by=c('ID', 'ID.mod')),
+    inner_join(
+      filter(calls, anc=='AFR', chr==c, start>st, end<ed), 
+      filter(anc.calls, anc.call=='EAS', chr==c, start>st, end<ed), by=c('ID', 'ID.mod'))
+  ) %>%  setnames(c('ID','chr','start','end','pop','anc','ID.mod','chr.y','start.y','end.y','anc.call.y'))
+  
+
+f2 <-
+  ggplot() + theme_bw() +
+
+  geom_segment(data=filter(calls.temp, chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod, yend=ID.mod, color=as.factor(anc)), alpha=1, size=1.5) +
+  geom_segment(data=filter(calls.temp, pop=='YRI', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod, yend=ID.mod, color=as.factor(pop)), alpha=1, size=1.5) +
+  coord_cartesian(xlim=c(st, ed), ylim=c(0,505)) +
+
+  geom_segment(data=filter(anc.calls, anc.call=='EUR', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod-0.25, yend=ID.mod-0.25, color=as.factor(anc.call)), linetype='dotdash') +
+  geom_segment(data=filter(anc.calls, anc.call=='EAS', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod+0.25, yend=ID.mod+0.25, color=as.factor(anc.call)), linetype='dotdash') +
+  facet_wrap(~chr, scales = "free_x") +
+  xlab('genomic_position') +
+  scale_x_continuous(breaks = seq(st,ed,by = 100000), labels=scientific(x = seq(st,ed,by = 100000), digits = 5)) +
+  scale_color_manual(values = color.values) +
+  ggtitle('Altai.2013.p_SingleArchaic ; IBDmix Calls') +
+  plot.theme
+
+
+grid.arrange(f1, f2, ncol=2)
+
+f1
+
+
+drop.table <- rbind(drop.table, data.table(chr=c,
+                                           strt=st+50000,
+                                           end=ed-50000))
+
+dt <- anti_join(dt, drop.table, by=c('chr','strt','end')) %>% as.data.table()
+
+```
+
+
+```{r}
+
+c(c, st, ed)
+
+coords <- paste(c, st, ed, sep = ' ')
+
+write.table(coords, file='~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/test.coord', quote=FALSE, sep=' ', row.names = FALSE, col.names = FALSE, append = TRUE)
+
+
+```
+
+
+```{r Collect genotype data for plotting}
+c <- 1 %>% as.numeric()
+st <- 6.2301e7 %>% as.numeric()
+ed <- 6.2751e7 %>% as.numeric()
+c(c, st, ed)
+
+write.table(filter(calls, chr==c, start>st, end<ed) %>% select('chr','start','end','anc','ID'), 
+            file = '~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/overlap_genotype_plots/chr1_62301000_62751000.neand_carriers',
+            quote = FALSE, sep='\t', row.names = FALSE, col.names = FALSE)
+
+##########
+##########
+
+c <- 1 %>% as.numeric()
+st <- 2.4415e7 %>% as.numeric()
+ed <- 2.4715e7 %>% as.numeric()
+c(c, st, ed)
+
+write.table(filter(calls, chr==c, start>st, end<ed) %>% select('chr','start','end','anc','ID'), 
+            file = '~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/overlap_genotype_plots/chr1_24415000_24715000.neand_carriers',
+            quote = FALSE, sep='\t', row.names = FALSE, col.names = FALSE)
+
+```
+
+
+
+
+```{r Read in test.coord file and plot}
+test.coords <- fread('~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/test.coord', col.names = c('chr','strt','end'))
+i <- 28
+c  <- test.coords[i,'chr'] %>% as.numeric()
+st <- test.coords[i,'strt'] %>% as.numeric() - 50000
+ed <- test.coords[i,'end'] %>% as.numeric() + 50000
+
+
+tg <- Adaptive.2016.callset %>% filter(chr==c & start > st & end < ed)
+tg2 <- GenePosNames.uniq %>% filter(chr==c & hg19.knownGene.txStart > st & hg19.knownGene.txEnd < ed)
+gws <- gwasSNPs %>% filter(CHR==c & POS %in% seq(st, ed) , P_VALUE <= 1.0e-8)
+
+
+f3 <- 
+  ggplot() + theme_bw() +
+  
+  geom_segment(data=filter(calls, chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod, yend=ID.mod, color=as.factor(anc)), alpha=1, size=1.5) +
+  geom_segment(data=filter(calls, pop=='YRI', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod, yend=ID.mod, color=as.factor(pop)), alpha=1, size=1.5) + 
+  coord_cartesian(xlim=c(st, ed), ylim = c(0,1670)) +
+    
+  geom_segment(data=filter(anc.calls, anc.call=='EUR', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod-0.25, yend=ID.mod-0.25, color=as.factor(anc.call)), linetype='dotdash') +
+  geom_segment(data=filter(anc.calls, anc.call=='EAS', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod+0.25, yend=ID.mod+0.25, color=as.factor(anc.call)), linetype='dotdash') +
+  facet_wrap(~chr, scales = "free_x") +
+  xlab('genomic_position') +
+  scale_x_continuous(breaks = seq(st,ed,by = 100000), labels=scientific(x = seq(st,ed,by = 100000), digits = 5)) +
+  scale_color_manual(values = color.values) +
+  ggtitle('Altai.2013.p_SingleArchaic ; IBDmix Calls') +
+  geom_rect(data=tg2, aes(xmin=hg19.knownGene.cdsStart, xmax=hg19.knownGene.cdsEnd, ymin=max(calls$ID.mod)+50, ymax=max(calls$ID.mod)+150), fill='steelblue1', alpha=1) + geom_text(data = tg2, aes(x=hg19.knownGene.cdsStart, y= max(calls$ID.mod)+200, label=hg19.kgXref.geneSymbol), size=3, angle=45) +
+  geom_point(data = gws, aes(x=POS, y=max(calls$ID.mod)+100), size=3, color="purple4", shape=17) +
+  plot.theme
+
+  
+calls.temp <- 
+  rbind(
+    inner_join(
+      filter(calls, anc=='AFR', chr==c, start>st, end<ed), 
+      filter(anc.calls, anc.call=='EUR', chr==c, start>st, end<ed), by=c('ID', 'ID.mod')),
+    inner_join(
+      filter(calls, anc=='AFR', chr==c, start>st, end<ed), 
+      filter(anc.calls, anc.call=='EAS', chr==c, start>st, end<ed), by=c('ID', 'ID.mod'))
+  ) %>%  setnames(c('ID','chr','start','end','pop','anc','ID.mod','chr.y','start.y','end.y','anc.call.y'))
+  
+
+f4 <- 
+  ggplot() + theme_bw() +
+
+  geom_segment(data=filter(calls.temp, chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod, yend=ID.mod, color=as.factor(anc)), alpha=1, size=1.5) +
+  geom_segment(data=filter(calls.temp, pop=='YRI', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod, yend=ID.mod, color=as.factor(pop)), alpha=1, size=1.5) +
+  coord_cartesian(xlim=c(st, ed), ylim=c(0,505)) +
+  
+  geom_segment(data=filter(anc.calls, anc.call=='EUR', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod-0.25, yend=ID.mod-0.25, color=as.factor(anc.call)), linetype='dotdash') +
+  geom_segment(data=filter(anc.calls, anc.call=='EAS', chr==c, start>st, end<ed), aes(x=start, xend=end, y=ID.mod+0.25, yend=ID.mod+0.25, color=as.factor(anc.call)), linetype='dotdash') +
+  facet_wrap(~chr, scales = "free_x") +
+  xlab('genomic_position') +
+  scale_x_continuous(breaks = seq(st,ed,by = 100000), labels=scientific(x = seq(st,ed,by = 100000), digits = 5)) +
+  scale_color_manual(values = color.values) +
+  ggtitle('Altai.2013.p_SingleArchaic ; IBDmix Calls') +
+  plot.theme
+
+
+grid.arrange(f3, f4, ncol=2)
+
+
+```
+
+

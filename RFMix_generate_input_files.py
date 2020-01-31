@@ -1,14 +1,18 @@
 import sys
 import gzip
+import pathlib
 
-
+# chr1
 impute_hap_file = sys.argv[1]+'.impute.hap'
 impute_legend_file = sys.argv[1]+'.impute.legend'
 impute_indv_file = sys.argv[1]+'.impute.hap.indv'
 
 genetic_coords_file = sys.argv[2]
+# /Genomics/akeylab/1000GP_Phase3/genetic_map_chr1_combined_b37.txt
 kg_samples_file = sys.argv[3]
+# /Genomics/akeylab/abwolf/NeanderthalSeq/IBDmix/1KGP.P3.SampleInfo.txt
 trgt_sample = sys.argv[4]
+# HG00096
 
 
 def write_alleles_file_fn(impute_hap_file, line_list):
@@ -50,10 +54,12 @@ def write_snp_locations_file_fn(impute_legend_file, genetic_coords_file):
                     rsnum = f_list[0]
                     pos = f_list [1]
                     allele0 = f_list[2]
-                    allele1 = f_list[1]
+                    allele1 = f_list[3]
 
                     if pos in snp_dict:
-                        #print(snp_dict[pos], file=o)
+                        ## Not all positions will have genetic_coordinates
+                        ## in the mapping file,
+                        ## so we can only report those that do.
                         o.write(snp_dict[pos]+'\n')
                         line_list.append(line_num)
     return(line_list)
@@ -73,8 +79,10 @@ def write_classes_file_fn(impute_indv_file,kg_samples_file,trgt_sample):
 
                 samples_dict[ID] = [pop,anc]
 
+#    print(samples_dict)
+
     with open(impute_indv_file) as f:
-        with open(impute_indv_file+'.classes','w') as o:
+        with open(trgt_sample+'.impute.hap.indv.classes','w') as o:
             for line in f:
                 ID = line.strip().split()[0]
 
@@ -84,16 +92,21 @@ def write_classes_file_fn(impute_indv_file,kg_samples_file,trgt_sample):
                     classes = '1'+' '+'1'+' '
                 elif samples_dict[ID][1] == 'EUR':
                     classes = '2'+' '+'2'+' '
+                elif samples_dict[ID][1] == 'EAS':
+                    classes = '3'+' '+'3'+' '
                 elif ID not in samples_dict:
                     print('not in samples_dict', file=sys.stderr)
-                    pass
+                    continue
                 o.write(classes)
 
 
 
+if pathlib.Path(impute_legend_file+'.snp_locations').exists():
+    print('snp_locations and allele files exist')
+    pass
+else:
+    print('Generating snp_locations and allele files')
+    line_list = write_snp_locations_file_fn(impute_legend_file, genetic_coords_file)
+    write_alleles_file_fn(impute_hap_file, line_list)
 
-line_list = write_snp_locations_file_fn(impute_legend_file, genetic_coords_file)
-
-write_alleles_file_fn(impute_hap_file, line_list)
-
-write_classes_file_fn(impute_indv_file, kg_samples_file,trgt_sample)
+write_classes_file_fn(impute_indv_file, kg_samples_file, trgt_sample)

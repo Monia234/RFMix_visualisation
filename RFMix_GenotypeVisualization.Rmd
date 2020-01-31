@@ -1,0 +1,273 @@
+---
+title: "Untitled"
+author: "Aaron Wolf"
+date: "9/25/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+
+library(data.table)
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(RColorBrewer)
+library(reshape2)
+library(ape)
+
+```
+
+
+```{r Load Genotype Data and Haplotype Overlap Data}
+
+fname <- paste0('~/DATALab/NeanderthalSeq/IBDmix/Altai_1kG_genotypes/','Altai_1KGP3_chr1_24415000_24715000.txt')
+fname <- paste0('~/DATALab/NeanderthalSeq/IBDmix/Altai_1kG_genotypes/','Altai_1KGP3_chr1_24360000_24970000.txt')
+
+fname <- paste0('~/DATALab/NeanderthalSeq/IBDmix/Altai_1kG_genotypes/','Altai_1KGP3_chr1_61248900_62875400.txt')
+
+fname <- paste0('~/DATALab/NeanderthalSeq/IBDmix/Altai_1kG_genotypes/','Altai_1KGP3_chr1_170870000_171070000.txt')
+
+
+
+
+col_names <- c('chr','pos','anc_allele','der_allele','Altai',seq(from=1,to = 2504, by = 1))
+
+Altai_1kG.derived_recode = fread(fname, select = seq(from=1, to = 2509), fill=TRUE, col.names = col_names) 
+                          #, colClasses = c('numeric','numeric','character','character',rep('numeric',times = 2505))
+  
+popfile <- fread('~/DATALab/NeanderthalSeq/IBDmix/1KGP.P3.SampleInfo.txt', 
+                 col.names = c('vcf_ID','1kG_ID','Pop','anc','Pop_num','Gender','X_ID'), 
+                 colClasses = c(rep('character',7))) %>%
+            rbind(list('Altai','Altai','Altai','Neand',NA,NA,NA)) %>%
+            filter(!Pop %in% c('ACB','ASW')) %>% as.data.table()
+            as.data.table()
+            
+cname <- paste0('~/DATALab//NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/overlap_genotype_plots/',
+                  'chr1_24415000_24715000')
+
+cname <- paste0('~/DATALab//NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/overlap_genotype_plots/',
+                  'chr1_62301000_62751000')
+
+cname <- paste0('~/DATALab//NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/overlap_genotype_plots/',
+                  'chr1_170870000_171070000')
+
+dt.neand_carrier <- fread(
+        paste0(cname, '.neand_carriers'),
+        col.names = c('ID_chr','strt.neand','end.neand','anc'),
+        fill = TRUE) %>% separate(ID_chr, into = c('1kG_ID','neand.carrier'), sep = '_', remove = FALSE) %>%
+        rbind(data.table('ID_chr'='Altai','strt.neand'=NA,'end.neand'=NA,'anc'='Neand','1kG_ID'='Altai','neand.carrier'=1))
+
+
+dt.anc_carrier <- fread(
+        paste0(cname,'.anc_carriers'),
+        col.names = c('ID_chr','strt.anc','end.anc','rfmix.anc'),
+        fill = TRUE) %>% separate(ID_chr, into = c('1kG_ID','anc.carrier'), sep = '_', remove = FALSE)
+
+```
+
+
+```{r Join genotype and Overlap data and write to .geno file}
+
+Altai_1kG_derived_recode.transposed <- Altai_1kG.derived_recode %>% 
+                                      select(-c('chr','pos','anc_allele','der_allele')) %>%
+                                      t() %>% as.data.table(keep.rownames = 'vcf_ID') %>% setnames(c('vcf_ID',Altai_1kG.derived_recode$pos)) %>%
+                                      left_join(select(popfile,c('vcf_ID','1kG_ID','anc')),by=c('vcf_ID')) %>% 
+  
+                                      left_join(select(dt.neand_carrier,c('1kG_ID','neand.carrier')), by=c('1kG_ID')) %>%
+                                      mutate(neand.carrier=ifelse(is.na(neand.carrier),0,1)) %>% 
+  
+  
+                                      left_join(select(dt.anc_carrier,c('1kG_ID','anc.carrier')), by=c('1kG_ID')) %>%
+                                      mutate(anc.carrier=ifelse(is.na(anc.carrier),0,1)) %>%
+                        
+                                      filter(anc %in% c('Neand','EUR','EAS','AFR')) %>%
+                                      #select(-c('anc','carrier'))
+                                      select('1kG_ID',anc.carrier,neand.carrier,everything()) %>%
+                                      as.data.table()
+
+write.table(x = Altai_1kG_derived_recode.transposed, 
+            file = paste0(cname,'.geno.extended'), 
+            quote = FALSE, sep = '\t',row.names = FALSE, col.names = TRUE)
+
+
+```
+
+
+```{r Load existing .geno file}
+
+genofile <- fread('~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/overlap_genotype_plots/chr1_24415000_24715000.geno')
+
+genofile <- fread('~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/overlap_genotype_plots/chr1_24415000_24715000.geno.extended')
+
+genofile <- fread('~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/overlap_genotype_plots/chr1_62301000_62751000.geno.extended')
+
+genofile <- fread('~/DATALab/NeanderthalSeq/IBDmix/RFMixtest/EAS_EUR_AFR/overlap_genotype_plots/chr1_170870000_171070000.geno.extended')
+
+Altai_1kG_derived_recode.transposed <- genofile
+
+```
+
+```{r Calculate pairwise distance}
+###################
+# 
+# Altai_1kG_derived_recode.transposed <- Altai_1kG_derived_recode.transposed %>% as.data.frame(row.names = Altai_1kG_derived_recode.transposed$vcf_ID) %>% select(-vcf_ID)
+# 
+# 
+# dt.dist <- dist.gene(x = Altai_1kG_derived_recode.transposed, method = "pairwise")
+# 
+# #Select sites just in downstream 10kb window
+# which(as.numeric(names(Altai_1kG_derived_recode.transposed))<st)    # which sites lie in the downstream 10kb window
+# which(as.numeric(names(Altai_1kG_derived_recode.transposed))>ed)    # which sites lie in the downstream 10kb window
+# dt.dist.10kb <- dist.gene(x = select(Altai_1kG_derived_recode.transposed,1:295), method = "pairwise")  #select just these sites to calculate distance matrix
+# 
+# 
+# # hierarchical clustering
+# hc <- hclust(dt.dist)
+# plot(hc)
+# clust.ID_list <- cutree(hc,k=6) %>% as.data.table(keep.rownames = TRUE) %>% setnames(c('vcf_ID','class')) %>% filter(class==1) %>% select(vcf_ID)
+# filter(clust.ID_list, vcf_ID %in% filter(popfile, `1kG_ID` %in% filter(calls, chr==c, start>=st, end<=ed)$ID)$vcf_ID)
+# 
+# # neighbor joinging
+# nbjn <- nj(dt.dist) %>% ladderize()
+# plot(nbjn)
+# 
+# # Principal coordinate analysis
+# res <- pcoa(dt.dist)
+# res <- pcoa(dt.dist.10kb)
+# #res$values
+# dt.res <- as.data.table(res$vectors, keep.rownames = "vcf_ID") %>% left_join(select(Altai_1kG_derived_recode.transposed, c(vcf_ID,anc,carrier)),by="vcf_ID")
+# ggplot() + geom_point(data=dt.res, aes(x=Axis.1, y=Axis.2, color=as.factor(carrier), shape=as.factor(anc)),fill=NA, size=3) + 
+#           #  geom_text(data=dt.res, aes(x=Axis.3, y=Axis.10, label=ifelse(vcf_ID=='Altai',vcf_ID,''))) +
+#             theme()
+# 
+# 
+# 
+# #v <- hc$order
+# v <- hc$order -1
+# v <- replace(v, v==0, 'Altai')
+# dt.derived_dist_Altai <- as.data.table(v,keep.rownames = TRUE) %>% cbind(seq(1,length(v),1)) %>% setnames(c('vcf_ID','rank_num'))
+# #dt.derived_dist_Altai <- as.data.table(v,keep.rownames = TRUE) %>% cbind(seq(1,length(v),1)) %>% setnames(c('vcf_ID','rank_num'))
+# 
+# 
+# ##############
+# 
+# 
+# # Melt Genotype data, add ancestry levels, add ranking order for clustering
+# Altai_1kG.derived_recode.melt <- Altai_1kG_sample %>% 
+#                                   select(-c('anc_allele','der_allele')) %>% 
+#                                   reshape2::melt(id = c('chr','pos')) %>% 
+#                                   setnames(c('chr','pos','vcf_ID','genotype')) %>% mutate(vcf_ID=as.character(vcf_ID), genotype=as.character(genotype)) %>%
+#                                   left_join(select(popfile,c('vcf_ID','anc')),by=c('vcf_ID')) %>%
+#                                   left_join(dt.derived_dist_Altai, by=c('vcf_ID'))
+#  
+# 
+# calls = Altai_1kG.derived_recode.melt %>%
+#         filter(anc %in% c(ancestry.levels)) %>%
+#         filter(genotype!=0) %>%
+# #        nrow()
+#         as.data.table()
+# 
+# 
+# 
+# #calls[, vcf_ID.mod := .GRP, by = c('genotype', 'vcf_ID')]
+
+
+```
+
+
+```{r Sample subgroups in order then gather into long dt}
+
+Altai_1kG_derived_recode.transposed[1:10,1:10]
+  
+
+# Altai_1kG_derived_recode.transposed.ordered <-
+#   Altai_1kG_derived_recode.transposed %>% 
+#   arrange(desc(neand.carrier), desc(anc), desc(anc.carrier)) %>% 
+#   as.data.table(keep.rownames = 'order')
+
+Altai_1kG_derived_recode.transposed.ordered <-
+  rbind(
+    Altai_1kG_derived_recode.transposed %>% # Neand genotypes
+    filter(anc=='Neand') %>% mutate(neand.carrier.alt = 'Neand'),
+    
+    Altai_1kG_derived_recode.transposed %>% # EURs with Neand
+    filter(anc=='EUR' & neand.carrier==1) %>% mutate(neand.carrier.alt = 'EUR_N') %>% slice(1:5),
+    
+    Altai_1kG_derived_recode.transposed %>% # EURs without Neand
+    filter(anc=='EUR' & neand.carrier==0) %>% mutate(neand.carrier.alt = 'EUR_n') %>% slice(1:5),
+    
+    Altai_1kG_derived_recode.transposed %>% # AFR with Neand and EUR.anc
+    filter(anc=='AFR' & neand.carrier==1 & anc.carrier == 1) %>% mutate(neand.carrier.alt = 'AFR_NE'),
+    
+    Altai_1kG_derived_recode.transposed %>% # AFR with EUR.anc , without Neand
+    filter(anc=='AFR' & neand.carrier==0 & anc.carrier == 1) %>% mutate(neand.carrier.alt = 'AFR_nE') %>% slice(1:5),
+    
+    Altai_1kG_derived_recode.transposed %>% # AFR without Neand or EUR.anc
+    filter(anc=='AFR' & neand.carrier==0 & anc.carrier == 0) %>% mutate(neand.carrier.alt = 'AFR_ne') %>% slice(1:5)
+  ) %>% as.data.table(keep.rownames = 'order')
+
+
+
+calls <- 
+  Altai_1kG_derived_recode.transposed.ordered %>%
+  gather(
+  -c(`1kG_ID`,anc.carrier,neand.carrier,vcf_ID,order,anc,neand.carrier.alt),
+  key='pos', value='genotype')
+
+
+calls$order <- as.numeric(calls$order)
+
+
+```
+
+
+
+```{r Plot Calls in Region}
+
+
+# calls <- Altai_1kG_derived_recode.transposed.ordered
+
+color.values <- c( '0' = 'lightblue', '1' = 'navyblue', '2' = 'orangered2')
+
+calls$neand.carrier.alt <- factor(calls$neand.carrier.alt,
+                                  levels = c('Neand','EUR_N','EUR_n','AFR_NE','AFR_nE','AFR_ne'), 
+                                  ordered = TRUE)
+
+  ggplot() + theme_bw() +
+  #geom_raster(data=Altai_1kG.derived_recode.melt, aes(x = as.character(pos), y=rank, fill=genotype)) + 
+  geom_raster(data=calls, 
+              aes(x = pos, y=desc(order), fill=as.factor(genotype))) +
+  scale_fill_manual(values=color.values) + 
+  scale_x_discrete(labels=NULL, expand = c(0,0)) +
+  facet_wrap(~neand.carrier.alt, scales = "free_y", strip.position = "left",ncol=1) +
+  xlab(paste0('chr1',' : ',min(calls$pos),'-',max(calls$pos))) +
+    
+  geom_vline(xintercept = which(unique(calls$pos) == '170918328'),size = 1, color='black', linetype='dashed') +
+  geom_vline(xintercept = which(unique(calls$pos) == '170984006'),size = 1, color='black', linetype='dashed') +
+
+  # geom_vline(xintercept = which(unique(calls$pos) == '24416980'),size = 1, color='black', linetype='dashed') +
+  # geom_vline(xintercept = which(unique(calls$pos) == '24711181'),size = 1, color='black', linetype='dashed') +
+    
+  # geom_vline(xintercept = which(unique(calls$pos) == '62340027'),size = 1, color='black', linetype='dashed') +
+  # geom_vline(xintercept = which(unique(calls$pos) == '62741049'),size = 1, color='black', linetype='dashed') +  
+    
+  theme(
+    #legend.position='none',
+    panel.grid=element_blank(),
+    axis.ticks.y=element_blank(),
+    panel.border = element_blank(),
+    #panel.border = element_rect(colour = "black", fill=NA, size=2),
+    axis.line.y = element_blank(),
+    plot.title=element_text(face="bold", size=20),
+    axis.text.x=element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.y=element_blank(),
+    axis.title.x=element_text(face="bold", size=15),
+    axis.title.y=element_text(face="bold", size=15)
+    #panel.background = element_rect(fill = "lightblue")
+    )
+
+
+```
